@@ -20,8 +20,8 @@ import javafx.stage.Stage;
  */
 public class App extends Application {
     //physics calculated with 10px = 1m
-    private static final int SCENE_SIZE_X = 1000;
-    private static final int SCENE_SIZE_Y = 1000;
+    private static final int SCENE_SIZE_X = 1920;
+    private static final int SCENE_SIZE_Y = 1080;
     //main timeline
     private Timeline timeline;
     private AnimationTimer eventTimer;
@@ -44,7 +44,7 @@ public class App extends Application {
                         .filter(c -> c instanceof CirclePhysics)
                         .map(c -> (CirclePhysics) c)
                         .forEach(c -> {
-                            c.refreshPosition(secondFromTheLastFrame);
+                            c.refresh(secondFromTheLastFrame);
                         });
             }
         };
@@ -53,6 +53,7 @@ public class App extends Application {
             @Override
             public void handle(MouseEvent e) {
                 CirclePhysics circle = new CirclePhysics(e.getSceneX(), e.getSceneY(), 10, Color.WHITE);
+                circle.setGravityOn(true);
                 root.getChildren().add(circle);
             }
         };
@@ -60,12 +61,25 @@ public class App extends Application {
         EventHandler<KeyEvent> pumpEventClick = new EventHandler<KeyEvent>() {
             @Override
             public void handle(KeyEvent e) {
-
+                root.getChildren().stream()
+                        .filter(f -> f instanceof CirclePhysics)
+                        .map(c -> (CirclePhysics) c)
+                        .forEach(c -> {
+                            c.applyForceX(randomNegativeOrPositive() * 1000 * Math.random());
+                            c.applyForceY(randomNegativeOrPositive() * 1000 * Math.random());
+                        });
             }
         };
-        scene.addEventHandler(MouseEvent.MOUSE_CLICKED, eventHandler);
+        scene.addEventHandler(MouseEvent.MOUSE_DRAGGED, eventHandler);
         scene.addEventHandler(KeyEvent.KEY_TYPED, pumpEventClick);
 
+    }
+
+    private int randomNegativeOrPositive() {
+        if (Math.floor(Math.random() * 100) % 2 == 0) {
+            return 1;
+        }
+        return -1;
     }
 
     private void addFrameCounter(Group root) {
@@ -120,30 +134,74 @@ public class App extends Application {
         private double accelerationY = 0d; // m/s²
         private double velocityY = 0d; // m/s
         private double mass = 1d; //kg
+        private boolean gravity = false;
+        private double bounce = 0d;
+        private static final double GRAVITY_CONSTANT = 98.0d; // m/s²
 
         CirclePhysics(double x, double y, double size, Paint color) {
             super(x, y, size, color);
         }
 
         void applyForceY(double force) {
-            accelerationY = force / mass;
+            accelerationY = accelerationY + (force / mass);
         }
 
         void applyForceX(double force) {
-            accelerationX = force / mass;
+            accelerationX = accelerationX + (force / mass);
         }
 
-        void refreshPosition(double timePassed) {
-            super.setTranslateX(getTranslateX() + calculateTranslateX(timePassed));
-            super.setTranslateY(getTranslateY() + calculateTranslateY(timePassed));
+        void refresh(double timePassed) {
+            if (gravity) {
+                velocityY = velocityY + (accelerationY + GRAVITY_CONSTANT) * timePassed;
+            } else {
+                velocityY = velocityY + accelerationY * timePassed;
+            }
+            velocityX = velocityX + accelerationX * timePassed;
+
+            refreshPosition(timePassed);
+            // logStatus();
+        }
+
+        private void refreshPosition(double timePassed) {
+            double translatedX = calculateTranslateX(timePassed);
+            double translatedY = calculateTranslateY(timePassed);
+
+            if (itWillBeInSceneXLimits(translatedX)) {
+                super.setCenterX(getCenterX() + translatedX);
+            } else {
+                this.velocityX = 0;
+                this.accelerationX = 0;
+            }
+
+            if (itWillBeInSceneYLimits(translatedY)) {
+                super.setCenterY(getCenterY() + translatedY);
+            } else {
+                this.velocityY = 0;
+                this.accelerationY = 0;
+            }
+
+        }
+
+        private boolean itWillBeInSceneYLimits(double translatedY) {
+            if (getCenterY() - getRadius() + translatedY >= 0 && getCenterY() + getRadius() + translatedY <= SCENE_SIZE_Y) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean itWillBeInSceneXLimits(double translatedX) {
+            if (getCenterX() - getRadius() + translatedX >= 0 && getCenterX() + getRadius() + translatedX <= SCENE_SIZE_X) {
+                return true;
+            }
+            return false;
         }
 
         private double calculateTranslateX(double timePassed) {
-            return (velocityX * timePassed) + ((accelerationX * timePassed * timePassed) / 2);
+            return (velocityX * timePassed);
         }
 
         private double calculateTranslateY(double timePassed) {
-            return (velocityY * timePassed) + ((accelerationY * timePassed * timePassed) / 2);
+            return (velocityY * timePassed);
         }
 
         public void setAccelerationX(double accelerationX) {
@@ -167,6 +225,16 @@ public class App extends Application {
                 mass = 1d;
             }
             this.mass = mass;
+        }
+
+        public void setGravityOn(boolean gravity) {
+            this.gravity = gravity;
+        }
+
+        private void logStatus() {
+            System.out.println("Position     X: " + this.getTranslateX() + " Position     Y: " + this.getTranslateY());
+            System.out.println("Velocity     X: " + this.velocityX + " Velocity     Y: " + this.velocityY);
+            System.out.println("Acceleration X: " + this.getTranslateX() + " Acceleration Y: " + this.getTranslateY());
         }
     }
 
