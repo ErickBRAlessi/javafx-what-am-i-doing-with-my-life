@@ -14,6 +14,10 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 
 /**
  * JavaFX App
@@ -28,6 +32,7 @@ public class App extends Application {
     private Integer frame = 0;
     private Double fps = 0d;
     private Double secondFromTheLastFrame;
+    private Set<CirclePhysics> allCircles = new HashSet<>();
 
     @Override
     public void start(Stage stage) {
@@ -54,6 +59,12 @@ public class App extends Application {
             public void handle(MouseEvent e) {
                 CirclePhysics circle = new CirclePhysics(e.getSceneX(), e.getSceneY(), 10, Color.WHITE);
                 circle.setGravityOn(true);
+                allCircles.add(circle);
+                circle.addSubscriber(allCircles);
+                root.getChildren().stream()
+                        .filter(c -> c instanceof CirclePhysics)
+                        .map(c -> (CirclePhysics) c)
+                        .forEach(c -> c.addSubscriber(allCircles));
                 root.getChildren().add(circle);
             }
         };
@@ -128,15 +139,18 @@ public class App extends Application {
         launch();
     }
 
-    private class CirclePhysics extends Circle {
+    private class CirclePhysics extends Circle implements Subscriber {
         private double accelerationX = 0d; // m/s²
         private double velocityX = 0d; // m/s
         private double accelerationY = 0d; // m/s²
         private double velocityY = 0d; // m/s
-        private double mass = 1d; //kg
+        private double mass = 100d; //kg
         private boolean gravity = false;
-        private double bounce = 0d;
+        private boolean collision = true;
+        private static final double BOUNCE_CONSTANT = 0.5d;
         private static final double GRAVITY_CONSTANT = 98.0d; // m/s²
+        private Set<CirclePhysics> otherCircles = new HashSet<>();
+
 
         CirclePhysics(double x, double y, double size, Paint color) {
             super(x, y, size, color);
@@ -157,29 +171,26 @@ public class App extends Application {
                 velocityY = velocityY + accelerationY * timePassed;
             }
             velocityX = velocityX + accelerationX * timePassed;
-
             refreshPosition(timePassed);
-            // logStatus();
         }
+
 
         private void refreshPosition(double timePassed) {
             double translatedX = calculateTranslateX(timePassed);
             double translatedY = calculateTranslateY(timePassed);
-
             if (itWillBeInSceneXLimits(translatedX)) {
                 super.setCenterX(getCenterX() + translatedX);
             } else {
-                this.velocityX = 0;
-                this.accelerationX = 0;
+                bounce();
             }
 
             if (itWillBeInSceneYLimits(translatedY)) {
                 super.setCenterY(getCenterY() + translatedY);
             } else {
-                this.velocityY = 0;
-                this.accelerationY = 0;
+                bounce();
             }
-
+            otherCircles.forEach(c -> c.update(this));
+            //logStatus();
         }
 
         private boolean itWillBeInSceneYLimits(double translatedY) {
@@ -202,6 +213,15 @@ public class App extends Application {
 
         private double calculateTranslateY(double timePassed) {
             return (velocityY * timePassed);
+        }
+
+        public double getCinematicEnergy() {
+            double scalar = getScalar();
+            return mass * scalar * scalar / 2; // Ec = m * V² / 2
+        }
+
+        public double getScalar() {
+            return (Math.sqrt(velocityX * velocityX + velocityY * velocityY));
         }
 
         public void setAccelerationX(double accelerationX) {
@@ -227,15 +247,83 @@ public class App extends Application {
             this.mass = mass;
         }
 
+        public double getAccelerationX() {
+            return accelerationX;
+        }
+
+        public double getVelocityX() {
+            return velocityX;
+        }
+
+        public double getAccelerationY() {
+            return accelerationY;
+        }
+
+        public double getVelocityY() {
+            return velocityY;
+        }
+
+        public double getMass() {
+            return mass;
+        }
+
+        public boolean isGravity() {
+            return gravity;
+        }
+
+        public void setGravity(boolean gravity) {
+            this.gravity = gravity;
+        }
+
         public void setGravityOn(boolean gravity) {
             this.gravity = gravity;
         }
 
         private void logStatus() {
-            System.out.println("Position     X: " + this.getTranslateX() + " Position     Y: " + this.getTranslateY());
-            System.out.println("Velocity     X: " + this.velocityX + " Velocity     Y: " + this.velocityY);
-            System.out.println("Acceleration X: " + this.getTranslateX() + " Acceleration Y: " + this.getTranslateY());
+            System.out.println(otherCircles.size());
+            //  System.out.println("Position     X: " + this.getTranslateX() + " Position     Y: " + this.getTranslateY());
+            // System.out.println("Velocity     X: " + this.velocityX + " Velocity     Y: " + this.velocityY);
+            //System.out.println("Acceleration X: " + this.getTranslateX() + " Acceleration Y: " + this.getTranslateY());
         }
+
+        @Override
+        public void update(CirclePhysics c) {
+            if (collision) {
+                if (Math.abs(c.getCenterX() - this.getCenterX()) < this.getRadius() * 2 && Math.abs(c.getCenterY() - this.getCenterY()) < this.getRadius() * 2) {
+                    collide(c);
+                }
+            }
+        }
+
+        public void addSubscriber(Set<CirclePhysics> circles) {
+            otherCircles = circles.stream().filter(c -> c != this).collect(Collectors.toSet());
+        }
+
+
+        private void collide(CirclePhysics otherCircle) {
+            //double energy = otherCircle.getCinematicEnergy();
+            velocityX = -1 * otherCircle.velocityX * otherCircle.getMass() / mass;
+            velocityY = -1 * otherCircle.velocityX * otherCircle.getMass() / mass;
+        }
+
+        private void bounce() {
+            velocityX *= -1 * BOUNCE_CONSTANT;
+            accelerationX *= -1 * BOUNCE_CONSTANT;
+            velocityY *= -1 * BOUNCE_CONSTANT;
+            accelerationY *= -1 + BOUNCE_CONSTANT;
+        }
+
+        private void stop() {
+            velocityX = 0d;
+            accelerationX = 0d;
+            velocityY = 0d;
+            accelerationY = 0d;
+        }
+
+    }
+
+    interface Subscriber {
+        void update(CirclePhysics circle);
     }
 
 }
