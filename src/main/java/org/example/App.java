@@ -144,11 +144,12 @@ public class App extends Application {
         private double velocityX = 0d; // m/s
         private double accelerationY = 0d; // m/s²
         private double velocityY = 0d; // m/s
-        private double mass = 100d; //kg
-        private boolean gravity = false;
-        private boolean collision = true;
+        private double mass = 10d; //kg
+        private boolean gravity = true;
+        private boolean collision = false;
         private static final double BOUNCE_CONSTANT = 0.5d;
         private static final double GRAVITY_CONSTANT = 98.0d; // m/s²
+        private static final double FLOOR_DRAG = 0.7d;
         private Set<CirclePhysics> otherCircles = new HashSet<>();
 
 
@@ -181,13 +182,13 @@ public class App extends Application {
             if (itWillBeInSceneXLimits(translatedX)) {
                 super.setCenterX(getCenterX() + translatedX);
             } else {
-                bounce();
+                bounceX();
             }
 
             if (itWillBeInSceneYLimits(translatedY)) {
                 super.setCenterY(getCenterY() + translatedY);
             } else {
-                bounce();
+                bounceY();
             }
             otherCircles.forEach(c -> c.update(this));
             //logStatus();
@@ -296,7 +297,9 @@ public class App extends Application {
         }
 
         public void addSubscriber(Set<CirclePhysics> circles) {
-            otherCircles = circles.stream().filter(c -> c != this).collect(Collectors.toSet());
+            if (collision) {
+                otherCircles = circles.stream().filter(c -> c != this).collect(Collectors.toSet());
+            }
         }
 
 
@@ -306,12 +309,18 @@ public class App extends Application {
             velocityY = -1 * otherCircle.velocityX * otherCircle.getMass() / mass;
         }
 
-        private void bounce() {
+        private void bounceX() {
             velocityX *= -1 * BOUNCE_CONSTANT;
             accelerationX *= -1 * BOUNCE_CONSTANT;
+        }
+
+        private void bounceY() {
+            velocityX *= FLOOR_DRAG;
+            accelerationX *= FLOOR_DRAG;
             velocityY *= -1 * BOUNCE_CONSTANT;
             accelerationY *= -1 + BOUNCE_CONSTANT;
         }
+
 
         private void stop() {
             velocityX = 0d;
