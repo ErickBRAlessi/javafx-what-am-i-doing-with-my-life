@@ -190,7 +190,9 @@ public class App extends Application {
             } else {
                 bounceY();
             }
-            otherCircles.forEach(c -> c.update(this));
+            if (collision) {
+                otherCircles.forEach(c -> c.update(this));
+            }
             //logStatus();
         }
 
