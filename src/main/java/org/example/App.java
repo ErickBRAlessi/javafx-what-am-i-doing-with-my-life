@@ -45,26 +45,20 @@ public class App extends Application {
         eventTimer = new AnimationTimer() {
             @Override
             public void handle(long l) {
-                root.getChildren().stream()
-                        .filter(c -> c instanceof CirclePhysics)
-                        .map(c -> (CirclePhysics) c)
-                        .forEach(c -> {
-                            c.refresh(secondFromTheLastFrame);
-                        });
+                root.getChildren().stream().filter(c -> c instanceof CirclePhysics).map(c -> (CirclePhysics) c).forEach(c -> {
+                    c.refresh(secondFromTheLastFrame);
+                });
             }
         };
         eventTimer.start();
         EventHandler<MouseEvent> eventHandler = new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent e) {
-                CirclePhysics circle = new CirclePhysics(e.getSceneX(), e.getSceneY(), 10, Color.WHITE);
+                CirclePhysics circle = new CirclePhysics(e.getSceneX(), e.getSceneY(), Math.random() * 20 + 10, Math.random() * 10 + 5, Color.color(Math.random(), Math.random(), Math.random()));
                 circle.setGravityOn(true);
                 allCircles.add(circle);
                 circle.addSubscriber(allCircles);
-                root.getChildren().stream()
-                        .filter(c -> c instanceof CirclePhysics)
-                        .map(c -> (CirclePhysics) c)
-                        .forEach(c -> c.addSubscriber(allCircles));
+                root.getChildren().stream().filter(c -> c instanceof CirclePhysics).map(c -> (CirclePhysics) c).forEach(c -> c.addSubscriber(allCircles));
                 root.getChildren().add(circle);
             }
         };
@@ -72,16 +66,13 @@ public class App extends Application {
         EventHandler<KeyEvent> pumpEventClick = new EventHandler<KeyEvent>() {
             @Override
             public void handle(KeyEvent e) {
-                root.getChildren().stream()
-                        .filter(f -> f instanceof CirclePhysics)
-                        .map(c -> (CirclePhysics) c)
-                        .forEach(c -> {
-                            c.applyForceX(randomNegativeOrPositive() * 1000 * Math.random());
-                            c.applyForceY(randomNegativeOrPositive() * 1000 * Math.random());
-                        });
+                root.getChildren().stream().filter(f -> f instanceof CirclePhysics).map(c -> (CirclePhysics) c).forEach(c -> {
+                    c.applyForceX(randomNegativeOrPositive() * 1000 * Math.random());
+                    c.applyForceY(randomNegativeOrPositive() * 1000 * Math.random());
+                });
             }
         };
-        scene.addEventHandler(MouseEvent.MOUSE_DRAGGED, eventHandler);
+        scene.addEventHandler(MouseEvent.MOUSE_CLICKED, eventHandler);
         scene.addEventHandler(KeyEvent.KEY_TYPED, pumpEventClick);
 
     }
@@ -146,15 +137,18 @@ public class App extends Application {
         private double velocityY = 0d; // m/s
         private double mass = 10d; //kg
         private boolean gravity = true;
-        private boolean collision = false;
+        private boolean collision = true;
+        private int collisionCounter = 0;
+        private static final int COLLISION_CYCLES = 1500;
         private static final double BOUNCE_CONSTANT = 0.5d;
         private static final double GRAVITY_CONSTANT = 98.0d; // m/s²
         private static final double FLOOR_DRAG = 0.7d;
         private Set<CirclePhysics> otherCircles = new HashSet<>();
 
 
-        CirclePhysics(double x, double y, double size, Paint color) {
-            super(x, y, size, color);
+        CirclePhysics(double x, double y, double radious, double mass, Paint color) {
+            super(x, y, radious, color);
+            this.mass = mass;
         }
 
         void applyForceY(double force) {
@@ -292,8 +286,13 @@ public class App extends Application {
         @Override
         public void update(CirclePhysics c) {
             if (collision) {
-                if (Math.abs(c.getCenterX() - this.getCenterX()) < this.getRadius() * 2 && Math.abs(c.getCenterY() - this.getCenterY()) < this.getRadius() * 2) {
-                    collide(c);
+                if (collisionCounter >= COLLISION_CYCLES) {
+                    if (Math.abs(c.getCenterX() - this.getCenterX()) < this.getRadius() * 2 && Math.abs(c.getCenterY() - this.getCenterY()) < this.getRadius() * 2) {
+                        collide(c);
+                        collisionCounter = 0;
+                    }
+                } else {
+                    collisionCounter++;
                 }
             }
         }
@@ -336,5 +335,4 @@ public class App extends Application {
     interface Subscriber {
         void update(CirclePhysics circle);
     }
-
 }
